@@ -5,6 +5,8 @@ ServiceWire
 
 ### A Lightweight Services Library for .NET.
 
+*This fork adds support for strong name assembly signing*
+
 ServiceWire is a very fast and light weight services host and dynamic client library that simplifies the development and use of high performance remote procedure call (RPC) communication between .NET processes over Named Pipes or TCP/IP.
 
 Find "how to use" examples in the tests code. [ServiceWire documentation][] is available on the wiki.
