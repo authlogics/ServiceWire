@@ -9,7 +9,7 @@
 		<Authors>Tyler Jensen</Authors>
 		<Company />
 		<PackageIcon>icon.png</PackageIcon>
-		<PackageProjectUrl>https://github.com/tylerjensen/ServiceWire</PackageProjectUrl>
+		<PackageProjectUrl>https://github.com/authlogics/ServiceWire</PackageProjectUrl>
 		<PackageLicenseFile>License.txt</PackageLicenseFile>
 		<Copyright>Tyler Jensen 2013-2021</Copyright>
 		<Version>5.5.3</Version>
@@ -17,6 +17,10 @@
 		<PackageTags>WCF Services Host Client NamedPipes TCP Messaging RPC Interception Zero Knowledge Secure Remote Password Protocol Serialization</PackageTags>
 		<PackageReleaseNotes>Contributed support for Enum by ref.</PackageReleaseNotes>
 		<PlatformTarget>AnyCPU</PlatformTarget>
+		<PackageId>Authlogics.ServiceWire</PackageId>
+		<Title>ServiceWire signed with a strongname</Title>
+		<SignAssembly>True</SignAssembly>
+		<AssemblyOriginatorKeyFile>servicewire.snk</AssemblyOriginatorKeyFile>
 	</PropertyGroup>
 
 	<ItemGroup>
