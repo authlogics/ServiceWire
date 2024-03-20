@@ -12,6 +12,7 @@ namespace ServiceWire.TcpIp
         private string _username;
         private string _password;
         private TcpChannelIdentifier _channelIdentifier;
+        private bool _connected;
 
         /// <summary>
         /// Creates a connection to the concrete object handling method calls on the server side
@@ -66,50 +67,85 @@ namespace ServiceWire.TcpIp
             _client = new Socket(AddressFamily.InterNetwork, SocketType.Stream, ProtocolType.Tcp); // TcpClient(AddressFamily.InterNetwork);
             _client.LingerState.Enabled = false;
 
-            var connected = false;
             var connectEventArgs = new SocketAsyncEventArgs
             {
                 RemoteEndPoint = endpoint
             };
-            connectEventArgs.Completed += new EventHandler<SocketAsyncEventArgs>((sender, e) =>
-            {
-                connected = true;
-            });
 
-            if (_client.ConnectAsync(connectEventArgs))
-            {
-                //operation pending - (false means completed synchronously)
-                while (!connected)
-                {
-                    if (!SpinWait.SpinUntil(() => connected, connectTimeoutMs))
-                    {
-                        _client.Dispose();
-                        throw new TimeoutException("Unable to connect within " + connectTimeoutMs + "ms");
-                    }
-                }
-            }
-            if (connectEventArgs.SocketError != SocketError.Success)
-            {
-                _client.Dispose();
-                throw new SocketException((int)connectEventArgs.SocketError);
-            }
-            if (!_client.Connected)
-            {
-                _client.Dispose();
-                throw new SocketException((int)SocketError.NotConnected);
-            }
-            _stream = new BufferedStream(new NetworkStream(_client), 8192);
-            _binReader = new BinaryReader(_stream);
-            _binWriter = new BinaryWriter(_stream);
             try
             {
-                SyncInterface(_serviceType, _username, _password);
+                _connected = false;
+
+                connectEventArgs.Completed += CompletedEvent;
+
+                if (_client.ConnectAsync(connectEventArgs))
+                {
+                    //operation pending - (false means completed synchronously)
+                    while (!_connected)
+                    {
+                        if (!SpinWait.SpinUntil(() => _connected, connectTimeoutMs))
+                        {
+                            _client.Dispose();
+                            throw new TimeoutException("Unable to connect within " + connectTimeoutMs + "ms");
+                        }
+                    }
+                }
+
+                if (connectEventArgs.SocketError != SocketError.Success)
+                {
+                    _client.Dispose();
+                    throw new SocketException((int) connectEventArgs.SocketError);
+                }
+
+                if (!_client.Connected)
+                {
+                    _client.Dispose();
+                    throw new SocketException((int) SocketError.NotConnected);
+                }
+
+                _stream = new BufferedStream(new NetworkStream(_client), 8192);
+                _binReader = new BinaryReader(_stream);
+                _binWriter = new BinaryWriter(_stream);
+                try
+                {
+                    SyncInterface(_serviceType, _username, _password);
+                }
+                catch
+                {
+                    this.Dispose(true);
+                    throw;
+                }
             }
-            catch
+            finally
             {
-                this.Dispose(true);
-                throw;
+                // All of this was found due to an application that grew to a run-time foot-print
+                // of 5 Gb!  Running Redgate ANTS memory profiler found a set of objects that were
+                // being retained in Gen2 due to a number of references related to the SocketAsyncEventArgs
+                // each step in this was able to finally get a flat memory profile when making and breaking
+                // connections between client and server.
+
+                // Nulling these object references helps the garbage collector by breaking the 
+                // references to the socket and endpoint objects.
+
+                connectEventArgs.AcceptSocket = null;
+                connectEventArgs.RemoteEndPoint = null;
+
+                // Must explicitly remove the CompletedEvent from the Action handler
+                // otherwise there is a circular reference which causes a number of objects
+                // to not be garbage collected for each connection made and broken.
+
+                connectEventArgs.Completed -= CompletedEvent;
+
+                // If this isn't explicitly Disposed, there is a retained reference from
+                // System.Threading.IOCompletionCallback
+
+                connectEventArgs.Dispose();
             }
+        }
+
+        private void CompletedEvent(object sender, SocketAsyncEventArgs e)
+        {
+            _connected = true;
         }
 
         protected override IChannelIdentifier ChannelIdentifier => _channelIdentifier;
